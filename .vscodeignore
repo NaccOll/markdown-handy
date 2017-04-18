@@ -1,0 +1,6 @@
+.vscode/**
+.vscode-test/**
+test/**
+jsconfig.json
+vsc-extension-quickstart.md
+.eslintrc.json

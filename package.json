@@ -1,0 +1,227 @@
+{
+    "name": "markdown-handy",
+    "displayName": "vscode-markdown-handy",
+    "description": "convert",
+    "version": "0.0.1",
+    "publisher": "NaccOll",
+    "engines": {
+        "vscode": "^1.11.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onCommand:extension.markdown-handy.convert"
+    ],
+    "main": "./extension",
+    "contributes": {
+        "commands": [{
+            "command": "extension.markdown-handy.convert",
+            "title": "Convert Markdown To Other"
+        }],
+        "menus": {
+            "editor/context": [{
+                "when": "resourceLangId == markdown",
+                "command": "extension.markdown-handy.convert",
+                "group": "markdown-handy"
+            }]
+        },
+        "configuration": {
+            "type": "object",
+            "title": "markdown-handy configuration",
+            "properties": {
+                "markdown-handy.convertOnSave": {
+                    "type": [
+                        "boolean"
+                    ],
+                    "default": false,
+                    "description": "Enable Auto convert on save"
+                },
+                "markdown-handy.convertOnSaveExclude": {
+                    "type": [
+                        "array"
+                    ],
+                    "default": [],
+                    "description": "Excluded file name of convertOnSave option"
+                },
+                "markdown-handy.outputDirectory": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": "",
+                    "description": "Output Directory"
+                },
+                "markdown-handy.styles": {
+                    "type": [
+                        "array"
+                    ],
+                    "default": [],
+                    "description": "A list of local paths to the stylesheets to use from the markdown-handy. All '\\' need to be written as '\\\\'."
+                },
+                "markdown-handy.highlightStyle": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": "",
+                    "description": "Set the style file name. for example: github.css, monokai.css ... https://github.com/isagalaev/highlight.js/tree/master/src/styles"
+                },
+                "markdown-handy.highlight": {
+                    "type": [
+                        "boolean"
+                    ],
+                    "default": true,
+                    "description": "Enable Syntax highlighting"
+                },
+                "markdown-handy.breaks": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable line breaks"
+                },
+                "markdown-handy.emoji": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable emoji. http://www.webpagefx.com/tools/emoji-cheat-sheet/"
+                },
+                "markdown-handy.type": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": "pdf",
+                    "description": "Output format: pdf, html, png, jpeg"
+                },
+                "markdown-handy.quality": {
+                    "type": "number",
+                    "default": 90,
+                    "description": "Only used for types png & jpeg"
+                },
+                "markdown-handy.format": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": "A4",
+                    "description": "Page Option. Page size: A3, A4, A5, Legal, Letter, Tabloid"
+                },
+                "markdown-handy.orientation": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": "portrait",
+                    "description": "Page Option. portrait or landscape"
+                },
+                "markdown-handy.border.top": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": "1.5cm",
+                    "description": "Page Option. Border Top. units: mm, cm, in, px"
+                },
+                "markdown-handy.border.bottom": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": "1cm",
+                    "description": "Page Option. Border bottom. units: mm, cm, in, px"
+                },
+                "markdown-handy.border.right": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": "1cm",
+                    "description": "Page Option. Border right. units: mm, cm, in, px"
+                },
+                "markdown-handy.border.left": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": "1cm",
+                    "description": "Page Option. Border left. units: mm, cm, in, px"
+                },
+                "markdown-handy.header.contents": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": "",
+                    "description": "Header contents"
+                },
+                "markdown-handy.header.height": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": "",
+                    "description": "Header height. units: mm, cm, in, px"
+                },
+                "markdown-handy.footer.contents": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": "<div style=\"text-align: center; margin-top: 0.5cm;\">{{page}}/{{pages}}</div>",
+                    "description": "Footer contents"
+                },
+                "markdown-handy.footer.height": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": "0.8cm",
+                    "description": "Footer height. units: mm, cm, in, px"
+                },
+                "markdown-handy.StatusbarMessageTimeout": {
+                    "type": "number",
+                    "default": 10000,
+                    "description": "Statusbar message timeout [milliseconds]"
+                }
+            }
+        }
+
+    },
+    "scripts": {
+        "postinstall": "node ./node_modules/vscode/bin/install",
+        "test": "node ./node_modules/vscode/bin/test"
+    },
+    "dependencies": {
+        "argparse": "^1.0.9",
+        "cheerio": "^0.20.0",
+        "copy-paste": "^1.3.0",
+        "emoji-images": "^0.1.1",
+        "entities": "^1.1.1",
+        "highlight.js": "^9.9.0",
+        "html-pdf": "^2.0.1",
+        "iconv-lite": "^0.4.15",
+        "katex": "^0.6.0",
+        "linkify-it": "^2.0.3",
+        "lodash.assign": "^4.2.0",
+        "markdown-it": "^8.2.2",
+        "markdown-it-anchor": "^3.0.0",
+        "markdown-it-footnote": "^3.0.1",
+        "markdown-it-table-of-contents": "^0.3.2",
+        "markdown-it-checkbox": "^1.1.0",
+        "markdown-it-emoji": "^1.2.0",
+        "match-at": "^0.1.0",
+        "mdurl": "^1.0.1",
+        "mustache": "^2.2.1",
+        "which": "^1.2.10",
+        "sprintf-js": "^1.0.3",
+        "string": "^3.3.3",
+        "uc.micro": "^1.0.3"
+    },
+    "devDependencies": {
+        "typescript": "^2.0.3",
+        "vscode": "^1.0.0",
+        "mocha": "^2.3.3",
+        "eslint": "^3.6.0",
+        "@types/node": "^6.0.40",
+        "@types/mocha": "^2.2.32"
+    }
+}
