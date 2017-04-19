@@ -1,10 +1,12 @@
 # vscode-markdown-handy README
 
+[简体中文](README_CN.md)
+
 ## Reason
 
 Recently, I could not bear the slowness of atom and the crash from time to time, so I started using vscode.
 
-I did not find the extension about markdown that I like. I want to build it that I satisfied, However, I am not good at javascript and do not know much about the advanced skills or modules. Finally, I decided to customize combine the existing extension to customize a extension of my own.
+I did not find the extension about markdown that I like. I want to build it that I satisfied, However, I am not good at javascript and do not know much about the advanced skills or modules. Finally, I decided to combine the existing extension to customize a extension of my own.
 
 
 ## Release Notes

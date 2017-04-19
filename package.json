@@ -84,14 +84,6 @@
                     "default": true,
                     "description": "Enable emoji. http://www.webpagefx.com/tools/emoji-cheat-sheet/"
                 },
-                "markdown-handy.type": {
-                    "type": [
-                        "string",
-                        "null"
-                    ],
-                    "default": "pdf",
-                    "description": "Output format: pdf, html, png, jpeg"
-                },
                 "markdown-handy.quality": {
                     "type": "number",
                     "default": 90,
