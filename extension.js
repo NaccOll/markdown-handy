@@ -1,27 +1,115 @@
 'use strict';
-var vscode = require('vscode');
-var path = require('path');
-var fs = require('fs');
-var url = require('url');
-var mdfilename = '';
+
+const vscode = require('vscode')
+const path = require('path')
+const fs = require('fs')
+const url = require('url')
+const hljs = require('highlight.js')
+const cp = require('copy-paste')
+const kt = require('katex')
+const md = require('markdown-it')({
+  html: true,
+  breaks: vscode.workspace.getConfiguration('markdown-handy')['breaks'],
+  highlight: function (str, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        str = hljs.highlight(lang, str, true).value;
+      } catch (e) {
+        str = md.utils.escapeHtml(str);
+
+        vscode.window.showErrorMessage('ERROR: markdown-it:highlight');
+        vscode.window.showErrorMessage(e.message);
+        vscode.window.setStatusBarMessage('');
+      }
+    } else {
+      str = md.utils.escapeHtml(str);
+    }
+    return '<pre class="hljs"><code><div>' + str + '</div></code></pre>';
+  }
+});
+// checkbox
+md.use(require('markdown-it-checkbox'));
+let f = vscode.workspace.getConfiguration('markdown-handy')['emoji'];
+let options;
+if (f) {
+  const emojies_defs = require(path.join(__dirname, 'data', 'emoji.json'));
+  try {
+    options = {
+      defs: emojies_defs
+    };
+  } catch (e) {
+    vscode.window.showErrorMessage('ERROR: markdown-it-emoji:options');
+    vscode.window.showErrorMessage(e.message);
+    vscode.window.setStatusBarMessage('');
+  }
+  md.use(require('markdown-it-emoji'), options);
+  md.renderer.rules.emoji = function (token, idx) {
+    let emoji = token[idx].markup;
+    let emojipath = path.join(
+      __dirname, 'node_modules', 'emoji-images', 'pngs', emoji + '.png');
+    let emojidata = utils.readFile(emojipath, null).toString('base64');
+    if (emojidata) {
+      return '<img class="emoji" alt="' + emoji +
+        '" src="data:image/png;base64,' + emojidata + '" />';
+    } else {
+      return ':' + emoji + ':';
+    }
+  };
+}
+
+const utils = require('./utils')
+let mdfilename = '';
+
 
 function activate(context) {
-  init();
-  var disposable_command = vscode.commands.registerCommand(
-    'extension.markdown-handy.convert',
-    function () {
-      MarkdownPdf();
-    });
-  context.subscriptions.push(disposable_command);
+  utils.init();
+  // let disposable_command = vscode.commands.registerCommand(
+  //   'extension.markdown-handy.convert',
+  //   function () {
+  //     MarkdownConvert();
+  //   });
+  // context.subscriptions.push(disposable_command);
 
-  var isConvertOnSave =
-    vscode.workspace.getConfiguration('markdown-handy')['convertOnSave'];
-  if (isConvertOnSave) {
-    var disposable_onsave = vscode.workspace.onDidSaveTextDocument(function () {
-      MarkdownPdfOnSave();
-    });
-    context.subscriptions.push(disposable_onsave);
+  let provider = MarkdownProvider.create(context)
+  let reg1 = vscode.workspace.registerTextDocumentContentProvider('markdown-handy', provider)
+  let reg2 = vscode.commands.registerCommand('markdown-handy.showPreview', MarkdownProvider.showPreviewCmd)
+  let reg3 = vscode.commands.registerCommand('markdown-handy.exportToOther', MarkdownProvider.exportHtmlCmd)
+  let reg4 = vscode.commands.registerCommand('markdown-handy.clipToHtml', MarkdownProvider.clipHtmlCmd)
+  let cfg = (key) => vscode.workspace.getConfiguration('markdown-handy')[key]
+
+
+  vscode.workspace.onDidChangeTextDocument(event => {
+    if (event.document.languageId === 'markdown' &&
+      event.document.uri.scheme !== 'markdown' // prevent processing of own documents
+      &&
+      event.document.isDirty) {
+      const uri = vscode.Uri.parse('markdown-handy://extension/markdown-handy');
+      provider.update(uri);
+    }
+  });
+
+  // context.subscriptions.push(reg1, reg2, reg3);
+  context.subscriptions.push(reg1, reg2, reg3, reg4);
+
+  // load additional extensions upon configuration ...
+  if (cfg('footnotes')) {
+    md.use(require('markdown-it-footnote'));
+    console.log("'markdown-it-footnote' enabled.");
   }
+  if (cfg('toc')['enabled']) {
+    md.use(require('markdown-it-anchor'), {
+      level: cfg('toc')['permalinkLevel'],
+      permalink: cfg('toc')['permalink'],
+      permalinkBefore: true,
+      permalinkSymbol: cfg('toc')['permalinkSymbol']
+    });
+    md.use(require('markdown-it-table-of-contents'), {
+      includeLevel: cfg('toc')['includeLevel']
+    });
+    console.log("'markdown-it-table-of-contents' enabled.");
+  }
+
+  console.log("'markdown-handy' activated !")
 }
 exports.activate = activate;
 
@@ -29,24 +117,24 @@ exports.activate = activate;
 function deactivate() {}
 exports.deactivate = deactivate;
 
-function MarkdownPdf() {
+function MarkdownConvert() {
   // check active window
-  var editor = vscode.window.activeTextEditor;
+  let editor = vscode.window.activeTextEditor;
   if (!editor) {
     vscode.window.showWarningMessage('No active Editor!');
     return;
   }
 
   // check markdown mode
-  var mode = editor.document.languageId;
+  let mode = editor.document.languageId;
   if (mode != 'markdown') {
     vscode.window.showWarningMessage('It is not a markdown mode!');
     return;
   }
 
   mdfilename = editor.document.fileName;
-  var ext = path.extname(mdfilename);
-  if (!isExistsFile(mdfilename)) {
+  let ext = path.extname(mdfilename);
+  if (!utils.isExistsFile(mdfilename)) {
     if (editor.document.isUntitled) {
       vscode.window.showWarningMessage('Please save the file!');
       return;
@@ -55,8 +143,7 @@ function MarkdownPdf() {
     return;
   }
 
-
-  var items = [];
+  let items = [];
   items.push({
     label: 'pdf',
     description: 'Render as pdf document'
@@ -66,120 +153,52 @@ function MarkdownPdf() {
     description: 'Render as html document'
   });
 
-
-
   vscode.window.showQuickPick(items).then(function (qpSelection) {
+    // check the select
     if (!qpSelection) {
       return;
     }
-    var type = qpSelection.label;
+
+    // assign the type of convert
+    let type = qpSelection.label;
+
     // convert markdown to html
-    var content = convertMarkdownToHtml(mdfilename,type);
+    let content = convertMarkdownToHtml(mdfilename, type);
 
     // make html
-    var html = makeHtml(content);
+    let html = makeHtml(content);
 
-    var types = ['html', 'pdf'];
-    var filename = '';
+    // let types = ['html', 'pdf'];
+    let filename = mdfilename.replace(ext, '.' + type);
+    filename = utils.getOutputDir(filename);
     // export html
     if (type == 'html') {
-      filename = mdfilename.replace(ext, '.' + type);
-      filename = getOutputDir(filename);
       exportHtml(html, filename);
       // export pdf/png/jpeg
-    } else if (types.indexOf(type) >= 1) {
-      filename = mdfilename.replace(ext, '.' + type);
-      filename = getOutputDir(filename);
-      exportPdf(html, filename,type);
+    } else if (type == 'pdf') {
+      exportPdf(html, filename, type);
 
-      var debug =
+      let debug =
         vscode.workspace.getConfiguration('markdown-handy')['debug'] || false;
       if (debug) {
-        var f = path.parse(mdfilename);
+        let f = path.parse(mdfilename);
         filename = path.join(f.dir, f.name + '_debug.html');
-        filename = getOutputDir(filename);
+        filename = utils.getOutputDir(filename);
         exportHtml(html, filename);
       }
-    } else {
-      vscode.window.showErrorMessage(
-        'ERROR: Supported formats: html, pdf, png, jpeg.');
-      vscode.window.setStatusBarMessage('');
-      return;
     }
   });
-}
-
-function MarkdownPdfOnSave() {
-  var editor = vscode.window.activeTextEditor;
-  var mode = editor.document.languageId;
-  if (mode != 'markdown') {
-    return;
-  }
-  if (!isMarkdownPdfOnSaveExclude()) {
-    MarkdownPdf();
-  }
-}
-
-function isMarkdownPdfOnSaveExclude() {
-  var editor = vscode.window.activeTextEditor;
-  var filename = path.basename(editor.document.fileName);
-  var patterns = vscode.workspace.getConfiguration(
-      'markdown-handy')['convertOnSaveExclude'] ||
-    '';
-  var pattern;
-  var i;
-  if (patterns && Array.isArray(patterns) && patterns.length > 0) {
-    for (i = 0; i < patterns.length; i++) {
-      pattern = patterns[i];
-      var re = new RegExp(pattern);
-      if (re.test(filename)) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 /*
  * convert markdown to html (markdown-it)
  */
 function convertMarkdownToHtml(filename, type) {
-  var hljs = require('highlight.js');
-  var breaks = vscode.workspace.getConfiguration('markdown-handy')['breaks'];
-  try {
-    var md = require('markdown-it')({
-      html: true,
-      breaks: breaks,
-      highlight: function (str, lang) {
-        if (lang && hljs.getLanguage(lang)) {
-          try {
-            str = hljs.highlight(lang, str, true).value;
-          } catch (e) {
-            str = md.utils.escapeHtml(str);
-
-            vscode.window.showErrorMessage('ERROR: markdown-it:highlight');
-            vscode.window.showErrorMessage(e.message);
-            vscode.window.setStatusBarMessage('');
-          }
-        } else {
-          str = md.utils.escapeHtml(str);
-        }
-        return '<pre class="hljs"><code><div>' + str + '</div></code></pre>';
-      }
-    });
-  } catch (e) {
-    vscode.window.showErrorMessage('ERROR: require(\'markdown-it\')');
-    vscode.window.showErrorMessage(e.message);
-    vscode.window.setStatusBarMessage('');
-  }
-
   // convert the img src of the markdown
-  // var type = vscode.workspace.getConfiguration('markdown-handy')['type'] || 'pdf';
-  var cheerio = require('cheerio');
-  var defaultRender = md.renderer.rules.image;
+  let defaultRender = md.renderer.rules.image;
   md.renderer.rules.image = function (tokens, idx, options, env, self) {
-    var token = tokens[idx];
-    var href = token.attrs[token.attrIndex('src')][1];
+    let token = tokens[idx];
+    let href = token.attrs[token.attrIndex('src')][1];
     if (type === 'html') {
       href = decodeURIComponent(href).replace(/("|')/g, '');
     } else {
@@ -193,76 +212,55 @@ function convertMarkdownToHtml(filename, type) {
   if (type !== 'html') {
     // convert the img src of the html
     md.renderer.rules.html_block = function (tokens, idx) {
-      var html = tokens[idx].content;
-      var $ = cheerio.load(html);
+      let html = tokens[idx].content;
+      const cheerio = require('cheerio');
+      let $ = cheerio.load(html);
       $('img').each(function () {
-        var src = $(this).attr('src');
-        var href = convertImgPath(src, filename);
+        let src = $(this).attr('src');
+        let href = convertImgPath(src, filename);
         $(this).attr('src', href);
       });
       return $.html();
     };
   }
 
-  // checkbox
-  md.use(require('markdown-it-checkbox'));
-
-  // emoji
-  var f = vscode.workspace.getConfiguration('markdown-handy')['emoji'];
-  if (f) {
-    var emojies_defs = require(path.join(__dirname, 'data', 'emoji.json'));
-    try {
-      var options = {
-        defs: emojies_defs
-      };
-    } catch (e) {
-      vscode.window.showErrorMessage('ERROR: markdown-it-emoji:options');
-      vscode.window.showErrorMessage(e.message);
-      vscode.window.setStatusBarMessage('');
+  let text = fs.readFileSync(filename, 'utf-8');
+  let isMath = vscode.workspace.getConfiguration('markdown-handy')['math'];
+  if (isMath) {
+    if (MarkdownProvider.hideFrontMatter) {
+      text = text.replace(/^\s*?[{-]{3}([\s\S]+?)[}-]{3}\s*?/, '');
     }
-    md.use(require('markdown-it-emoji'), options);
-    md.renderer.rules.emoji = function (token, idx) {
-      var emoji = token[idx].markup;
-      var emojipath = path.join(
-        __dirname, 'node_modules', 'emoji-images', 'pngs', emoji + '.png');
-      var emojidata = readFile(emojipath, null).toString('base64');
-      if (emojidata) {
-        return '<img class="emoji" alt="' + emoji +
-          '" src="data:image/png;base64,' + emojidata + '" />';
-      } else {
-        return ':' + emoji + ':';
-      }
-    };
+    for (let rule of MarkdownProvider.rules) { // apply rules ...
+      text = text.replace(rule.rex, rule.tmpl);
+    }
   }
-  return md.render(fs.readFileSync(filename, 'utf-8'));
+
+
+  return md.render(text);
 }
 
-/*
- * make html
- */
-function makeHtml(data) {
-  // read styles
-  var style = '';
-  style += readStyles();
-
-  // read template
-  var filename = path.join(__dirname, 'template', 'template.html');
-  var template = readFile(filename);
-
-  // compile template
-  var mustache = require('mustache');
-
-  try {
-    var view = {
-      style: style,
-      content: data
-    };
-  } catch (e) {
-    vscode.window.showErrorMessage('ERROR: mustache:view');
-    vscode.window.showErrorMessage(e.message);
+function convertImgPath(src, filename) {
+  let href = decodeURIComponent(src);
+  href = href.replace(/("|')/g, '').replace(/\\/g, '/').replace(/#/g, '%23');
+  let protocol = url.parse(href).protocol;
+  if (protocol === 'file:' && href.indexOf('file:///') !== 0) {
+    return href.replace(/^file:\/\//, 'file:///');
+  } else if (protocol === 'file:') {
+    return href;
+  } else if (!protocol || path.isAbsolute(href)) {
+    href = path.resolve(path.dirname(filename), href)
+      .replace(/\\/g, '/')
+      .replace(/#/g, '%23');
+    if (href.indexOf('//') === 0) {
+      return 'file:' + href;
+    } else if (href.indexOf('/') === 0) {
+      return 'file://' + href;
+    } else {
+      return 'file:///' + href;
+    }
+  } else {
+    return src;
   }
-
-  return mustache.render(template, view);
 }
 
 /*
@@ -270,7 +268,7 @@ function makeHtml(data) {
  */
 function exportHtml(data, filename) {
   vscode.window.setStatusBarMessage('$(markdown) Converting...');
-  var StatusbarMessageTimeout = vscode.workspace.getConfiguration(
+  let StatusbarMessageTimeout = vscode.workspace.getConfiguration(
     'markdown-handy')['StatusbarMessageTimeout'];
   fs.writeFile(filename, data, 'utf-8', function (err) {
     if (err) {
@@ -285,27 +283,122 @@ function exportHtml(data, filename) {
   });
 }
 
+
+function makeHtml(data) {
+  // read styles
+  let style = '';
+  style += readStyles();
+
+  // read template
+  let filename = path.join(__dirname, 'template', 'template.html');
+  let template = utils.readFile(filename);
+
+  // compile template
+  const mustache = require('mustache');
+  let view;
+  try {
+    view = {
+      style: style,
+      content: data
+    };
+  } catch (e) {
+    vscode.window.showErrorMessage('ERROR: mustache:view');
+    vscode.window.showErrorMessage(e.message);
+  }
+  return mustache.render(template, view);
+}
+
+function readStyles() {
+  let style = '';
+  let styles = '';
+  let filename = '';
+  let i;
+
+  // 1. read the style of the vscode.
+  style += makeCss(path.join(__dirname, 'styles', 'markdown.css'));
+
+  // 2. read the style of the markdown.styles setting.
+  styles = vscode.workspace.getConfiguration('markdown-handy')['styles'];
+  if (styles && Array.isArray(styles) && styles.length > 0) {
+    for (i = 0; i < styles.length; i++) {
+      let href = filename = styles[i];
+      let protocol = url.parse(href).protocol;
+      if (protocol === 'http:' || protocol === 'https:') {
+        style += '<link rel=\"stylesheet\" href=\""' + href + '"\" type=\"text/css\">';
+      } else if (protocol === 'file:') {
+        style += makeCss(filename);
+      }
+    }
+  }
+
+  // 3. read the style of the highlight.js.
+  let highlightStyle = vscode.workspace.getConfiguration('markdown-handy')['highlightStyle'] || '';
+  let ishighlight = vscode.workspace.getConfiguration('markdown-handy')['highlight'];
+  if (ishighlight) {
+    if (highlightStyle) {
+      let css = vscode.workspace.getConfiguration('markdown-handy')['highlightStyle'] || 'github.css';
+      filename = path.join(__dirname, 'node_modules', 'highlight.js', 'styles', css);
+    } else {
+      filename = path.join(__dirname, 'styles', 'tomorrow.css');
+    }
+    style += makeCss(filename);
+  }
+
+  // 4. read the style of the markdown-pdf.
+  style += makeCss(path.join(__dirname, 'styles', 'markdown-pdf.css'));
+
+  // 5. read the style of the markdown-pdf.styles settings.
+  styles = vscode.workspace.getConfiguration('markdown-handy')['styles'] || '';
+  if (styles && Array.isArray(styles) && styles.length > 0) {
+    for (i = 0; i < styles.length; i++) {
+      filename = styles[i];
+      if (!path.isAbsolute(filename)) {
+        if (vscode.workspace.rootPath == undefined) {
+          filename = path.join(path.dirname(mdfilename), filename);
+        } else {
+          filename = path.join(vscode.workspace.rootPath, filename);
+        }
+      }
+      style += makeCss(filename);
+    }
+  }
+
+  // 6. read the style of katex and mdmath.
+  let isMath = vscode.workspace.getConfiguration('markdown-handy')['math'];
+  if (isMath) {
+    style += makeCss(path.join(__dirname, 'styles', 'katex.min.css'));
+  }
+  return style;
+}
+
+function makeCss(filename) {
+  let css = utils.readFile(filename);
+  return css ? '\n<style>\n' + css + '\n</style>\n' : '';
+}
+
+
 /*
  * export a html to a pdf file (html-pdf)
  */
-function exportPdf(data, filename,type) {
+function exportPdf(data, filename, type) {
   vscode.window.setStatusBarMessage('$(markdown) Converting...');
-  var StatusbarMessageTimeout = vscode.workspace.getConfiguration(
+  let StatusbarMessageTimeout = vscode.workspace.getConfiguration(
     'markdown-handy')['StatusbarMessageTimeout'];
-  var phantomPath = getPhantomjsPath();
-  if (!checkPhantomjs()) {
-    installPhantomjsBinary();
+  let phantomPath = utils.getPhantomjsPath();
+  if (!utils.checkPhantomjs()) {
+    utils.installPhantomjsBinary();
   }
-  if (!checkPhantomjs()) {
+  if (!utils.checkPhantomjs()) {
     vscode.window.showErrorMessage(
       'ERROR: phantomjs binary does not exist: ' + phantomPath);
     vscode.window.setStatusBarMessage('');
     return;
   }
 
-  var htmlpdf = require('html-pdf');
+  const htmlpdf = require('html-pdf');
+  let options;
   try {
-    var options = {
+    options = {
       'format': vscode.workspace.getConfiguration('markdown-handy')['format'] || 'A4',
       'orientation': vscode.workspace.getConfiguration('markdown-handy')['orientation'] ||
         'portrait',
@@ -324,7 +417,6 @@ function exportPdf(data, filename,type) {
           ''
       },
       'type': type,
-      'quality': vscode.workspace.getConfiguration('markdown-handy')['quality'] || 90,
       'header': {
         'height': vscode.workspace.getConfiguration(
             'markdown-handy')['header']['height'] ||
@@ -338,8 +430,7 @@ function exportPdf(data, filename,type) {
             'markdown-handy')['footer']['height'] ||
           '',
         'contents': vscode.workspace.getConfiguration(
-            'markdown-handy')['footer']['contents'] ||
-          ''
+          'markdown-handy')['footer']['contents'] || ''
       },
       'phantomPath': phantomPath
     };
@@ -348,7 +439,6 @@ function exportPdf(data, filename,type) {
     vscode.window.showErrorMessage(e.message);
     vscode.window.setStatusBarMessage('');
   }
-
   try {
     htmlpdf.create(data, options).toBuffer(function (err, buffer) {
       fs.writeFile(filename, buffer, function (err) {
@@ -370,254 +460,153 @@ function exportPdf(data, filename,type) {
   }
 }
 
-function isExistsFile(filename) {
-  if (filename.length === 0) {
-    return false;
-  }
-  try {
-    if (fs.statSync(filename).isFile()) {
-      return true;
-    }
-  } catch (e) {
-    console.warn(e.message);
-    return false;
-  }
-}
-
-function isExistsDir(dirname) {
-  if (dirname.length === 0) {
-    return false;
-  }
-  try {
-    if (fs.statSync(dirname).isDirectory()) {
-      return true;
-    } else {
-      console.warn('undefined');
-      return false;
-    }
-  } catch (e) {
-    console.warn('false : ' + e.message);
-    return false;
-  }
-}
-
-function getOutputDir(filename) {
-  var output_dir =
-    vscode.workspace.getConfiguration('markdown-handy')['outputDirectory'] ||
-    '';
-  if (output_dir.length !== 0) {
-    if (isExistsDir(output_dir)) {
-      return path.join(output_dir, path.basename(filename));
-    } else {
-      vscode.window.showWarningMessage(
-        'Output directory does not exist! (markdown-pdf.outputDirectory) : ' +
-        output_dir);
-      return filename;
-    }
-  }
-  return filename;
-}
-
-function readFile(filename, encode) {
-  if (filename.length === 0) {
-    return '';
-  }
-  if (!encode && encode !== null) {
-    encode = 'utf-8';
-  }
-  if (filename.indexOf('file://') === 0) {
-    if (process.platform === 'win32') {
-      filename = filename.replace(/^file:\/\/\//, '').replace(/^file:\/\//, '');
-    } else {
-      filename = filename.replace(/^file:\/\//, '');
-    }
-  }
-  if (isExistsFile(filename)) {
-    return fs.readFileSync(filename, encode);
-  } else {
-    return '';
-  }
-}
-
-function convertImgPath(src, filename) {
-  var href = decodeURIComponent(src);
-  href = href.replace(/("|')/g, '').replace(/\\/g, '/').replace(/#/g, '%23');
-  var protocol = url.parse(href).protocol;
-  if (protocol === 'file:' && href.indexOf('file:///') !== 0) {
-    return href.replace(/^file:\/\//, 'file:///');
-  } else if (protocol === 'file:') {
-    return href;
-  } else if (!protocol || path.isAbsolute(href)) {
-    href = path.resolve(path.dirname(filename), href)
-      .replace(/\\/g, '/')
-      .replace(/#/g, '%23');
-    if (href.indexOf('//') === 0) {
-      return 'file:' + href;
-    } else if (href.indexOf('/') === 0) {
-      return 'file://' + href;
-    } else {
-      return 'file:///' + href;
-    }
-  } else {
-    return src;
-  }
-}
-
-function makeCss(filename) {
-  var css = readFile(filename);
-  if (css) {
-    return '\n<style>\n' + css + '\n</style>\n';
-  } else {
-    return '';
-  }
-}
-
-function readStyles() {
-  var style = '';
-  var styles = '';
-  var filename = '';
-  var i;
-
-  // 1. read the style of the vscode.
-  filename = path.join(__dirname, 'styles', 'markdown.css');
-  style += makeCss(filename);
-
-  // 2. read the style of the markdown.styles setting.
-  styles = vscode.workspace.getConfiguration('markdown-handy')['styles'];
-  if (styles && Array.isArray(styles) && styles.length > 0) {
-    for (i = 0; i < styles.length; i++) {
-      var href = filename = styles[i];
-      var protocol = url.parse(href).protocol;
-      if (protocol === 'http:' || protocol === 'https:') {
-        style +=
-          '<link rel=\"stylesheet\" href=\"" + href + "\" type=\"text/css\">';
-      } else if (protocol === 'file:') {
-        style += makeCss(filename);
-      }
-    }
-  }
-
-  // 3. read the style of the highlight.js.
-  var highlightStyle = vscode.workspace.getConfiguration('markdown-handy')['highlightStyle'] || '';
-  var ishighlight = vscode.workspace.getConfiguration('markdown-handy')['highlight'];
-  if (ishighlight) {
-    if (highlightStyle) {
-      var css =
-        vscode.workspace.getConfiguration('markdown-handy')['highlightStyle'] ||
-        'github.css';
-      filename =
-        path.join(__dirname, 'node_modules', 'highlight.js', 'styles', css);
-      style += makeCss(filename);
-    } else {
-      filename = path.join(__dirname, 'styles', 'tomorrow.css');
-      style += makeCss(filename);
-    }
-  }
-
-  // 4. read the style of the markdown-pdf.
-  filename = path.join(__dirname, 'styles', 'markdown-pdf.css');
-  style += makeCss(filename);
-
-  // 5. read the style of the markdown-pdf.styles settings.
-  styles = vscode.workspace.getConfiguration('markdown-handy')['styles'] || '';
-  if (styles && Array.isArray(styles) && styles.length > 0) {
-    for (i = 0; i < styles.length; i++) {
-      filename = styles[i];
-      if (!path.isAbsolute(filename)) {
-        if (vscode.workspace.rootPath == undefined) {
-          filename = path.join(path.dirname(mdfilename), filename);
-        } else {
-          filename = path.join(vscode.workspace.rootPath, filename);
-        }
-      }
-      style += makeCss(filename);
-    }
-  }
-
-  return style;
-}
-
-function getPhantomjsPath() {
-  // for reload phantomjs binary path
-  delete require.cache[path.join(
-    __dirname, 'node_modules', 'phantomjs-prebuilt', 'lib', 'location.js')];
-  delete require.cache[path.join(
-    __dirname, 'node_modules', 'phantomjs-prebuilt', 'lib', 'phantomjs.js')];
-  // load phantomjs binary path
-  var phantomPath = require(path.join(
-      __dirname, 'node_modules', 'phantomjs-prebuilt',
-      'lib', 'phantomjs'))
-    .path;
-  return phantomPath;
-}
-
-function checkPhantomjs() {
-  var phantomPath = getPhantomjsPath();
-  if (isExistsFile(phantomPath)) {
-    return true;
-  } else {
-    return false;
-  }
-}
-
-function installPhantomjsBinary() {
-  // which npm
-  var which = require('which');
-  var npm = '';
-  try {
-    npm = which.sync('npm');
-  } catch (e) {
-    console.warn(e.message);
-  }
-
-  // which node
-  var node = '';
-  try {
-    node = which.sync('node');
-  } catch (e) {
-    console.warn(e.message);
-  }
-
-  // npm rebuild phantomjs-prebuilt
-  var execSync = require('child_process').execSync;
-  if (isExistsFile(npm) && isExistsFile(node)) {
-    try {
-      var std = execSync('npm rebuild phantomjs-prebuilt', {
-        cwd: __dirname
-      });
-      console.log(std.toString());
-    } catch (e) {
-      vscode.window.showErrorMessage('ERROR: "npm rebuild phantomjs-prebuilt"');
-      vscode.window.showErrorMessage(e.message);
-      vscode.window.setStatusBarMessage('');
-    }
-  } else {
-    // node_modules/phantomjs-prebuilt/install.js
-    var install =
-      path.join(__dirname, 'node_modules', 'phantomjs-prebuilt', 'install.js')
-      .replace(/\\/g, '/');
-    try {
-      if (isExistsFile(install)) {
-        require(install);
-      }
-    } catch (e) {
-      console.error(e.message);
-    }
-  }
-
-  if (checkPhantomjs()) {
-    return;
-  }
-}
-
-function init() {
-  if (!checkPhantomjs()) {
-    installPhantomjsBinary();
-  }
-}
-
 // for './node_modules/phantomjs-prebuilt/install.js'
 // 'An extension called process.exit() and this was prevented.'
 process.exit = function () {
   console.info('process.exit');
+};
+
+
+const MarkdownProvider = {
+  create: function () {
+    var o = Object.create(this.prototype);
+    o.constructor.apply(o, arguments);
+    return o;
+  },
+  rules: [{
+      rex: /\\\$/g,
+      tmpl: "\xB6"
+    }, // substitute '\$' by '¶' temporarily ...
+    {
+      rex: /(\r?\n|^|>)\s*?\${2}([^$]*?)\${2}\s*?\(([^)$\r\n]*?)\)(?=$|\r?\n|\s)/g,
+      tmpl: ($0, $1, $2, $3) => `${$1}<section class="eqno"><eqn>${MarkdownProvider.math($2,true)}</eqn><span>(${$3})</span></section>\n`
+    }, // display equation $$...$$ equation number
+    {
+      rex: /(\r?\n|^|>)\s*?\${2}([^$]*?)\${2}(?=$|\r?\n|\s)/g,
+      tmpl: ($0, $1, $2) => `${$1}<section><eqn>${MarkdownProvider.math($2,true)}</eqn></section>\n`
+    }, // display equation $$...$$
+    {
+      rex: /(\D|\$|^)\$(\S[^$\r\n]*?\S)\$(?!\d)/g,
+      tmpl: ($0, $1, $2) => `${$1}<eq>${MarkdownProvider.math($2,false)}</eq>`
+    }, // multi-character inline equation $...$
+    {
+      rex: /(\D|^)\$([^$\r\n\t ]{1})\$(?!\d)/g,
+      tmpl: ($0, $1, $2) => `${$1}<eq>${MarkdownProvider.math($2,false)}</eq>`
+    }, // single-character inline equation $...$
+    {
+      rex: /\xB6/g,
+      tmpl: "$"
+    } // reverse temporary substitution ...
+  ],
+  math: function (tex, disp) {
+    let res;
+    try {
+      // don't forget to escape '_','*', and '\' .. after math rendering
+      res = kt.renderToString(tex, {
+        throwOnError: false,
+        displayMode: disp
+      }).replace(/([_\*\\])/g, "\\$1");
+    } catch (err) {
+      res = err;
+    }
+    return res;
+  },
+  viewUri: vscode.Uri.parse('markdown-handy://extension/markdown-handy'),
+  get activeDocument() {
+    let doc = vscode.window.activeTextEditor && vscode.window.activeTextEditor.document || MarkdownProvider._activeDocument || false;
+    if (!doc) vscode.window.showInformationMessage('Cannot locate current text document!');
+    return doc;
+  },
+  get fname() {
+    return MarkdownProvider.activeDocument.uri.fsPath;
+  },
+  get document() {
+    let text = MarkdownProvider.activeDocument.getText();
+    if (MarkdownProvider.hideFrontMatter) {
+      text = text.replace(/^\s*?[{-]{3}([\s\S]+?)[}-]{3}\s*?/, '');
+    }
+    for (let rule of MarkdownProvider.rules) { // apply rules ...
+      text = text.replace(rule.rex, rule.tmpl);
+    }
+    return md.render(text);
+  },
+  // implement 'hideFrontMatter' as a lazy getter for better performance.
+  // ... (see https://developer.mozilla.org/de/docs/Web/JavaScript/Reference/Functions/get)
+  get hideFrontMatter() {
+    delete this.hideFrontMatter;
+    return this.hideFrontMatter = vscode.workspace.getConfiguration('markdown')['previewFrontMatter'] === 'hide';
+  },
+
+  // see https://github.com/Microsoft/vscode/blob/master/extensions/markdown/src/extension.ts@getViewColumn
+  targetPreviewColumn(sideBySide) {
+    const vuecol = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : false;
+
+    return !vuecol ? vscode.ViewColumn.One :
+      !sideBySide ? vuecol :
+      vuecol === vscode.ViewColumn.One ? vscode.ViewColumn.Two :
+      vuecol === vscode.ViewColumn.Two ? vscode.ViewColumn.Three :
+      vuecol;
+  },
+  // proto ...
+  prototype: {
+    constructor: function (context) {
+      this.context = context;
+      this.emitter = new vscode.EventEmitter();
+      this.basePath = context.asAbsolutePath('.');
+    },
+    get onDidChange() {
+      return this.emitter.event;
+    },
+    update: function (uri) {
+      if (!this._waiting) {
+        this._waiting = true;
+        setTimeout(() => {
+          this._waiting = false;
+          this.emitter.fire(uri);
+        }, 600);
+      }
+    },
+    provideTextDocumentContent: function (uri, token) {
+      if (!token || !token.isCancellationRequested) {
+        // save current document for accessing it from preview window later ...
+        MarkdownProvider._activeDocument = vscode.window.activeTextEditor.document;
+        return `<!doctype html><html><head><meta charset='utf-8'>
+        <link rel="stylesheet" href="file://${this.basePath}/styles/markdown.css">
+        <link rel="stylesheet" href="file://${this.basePath}/styles/tomorrow.css">
+        <link rel="stylesheet" href="file://${this.basePath}/styles/katex.min.css">
+        <link rel="stylesheet" href="file://${this.basePath}/styles/mdmath.css">
+        <base href="${MarkdownProvider.activeDocument.uri.toString(true)}">
+        </head>
+        <body>
+        ${MarkdownProvider.document}
+        </body></html>`;
+      }
+    }
+  },
+
+  showPreviewCmd: function () {
+    vscode.commands.executeCommand('vscode.previewHtml',
+        MarkdownProvider.viewUri,
+        vscode.ViewColumn.Two,
+        "Preview: " + path.basename(MarkdownProvider.fname))
+      .then(success => {}, error => {
+        console.error(error)
+      });
+  },
+  clipHtmlCmd: function () {
+    let html = `<!doctype html><html><head><meta charset='utf-8'>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/2.4.1/github-markdown.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.6.0/katex.min.css">
+    <link rel="stylesheet" href="https://gitcdn.xyz/repo/goessner/mdmath/master/css/mdmath.css">
+    </head><body class="markdown-body">
+    ${MarkdownProvider.document}
+    </body></html>`;
+    cp.copy(html, () => vscode.window.showInformationMessage('Html copied to clipboard!'));
+  },
+  exportHtmlCmd: function () { // 
+    if (vscode.window.activeTextEditor) {
+      MarkdownConvert()
+    }
+  }
 };
