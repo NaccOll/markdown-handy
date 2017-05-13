@@ -79,9 +79,9 @@
           "default": false,
           "description": "Enable line breaks"
         },
-        "markdown-handy.math":{
-          "type":"boolean",
-          "default":true,
+        "markdown-handy.math": {
+          "type": "boolean",
+          "default": true,
           "description": "Enable math"
         },
         "markdown-handy.emoji": {
@@ -214,6 +214,14 @@
   "scripts": {
     "postinstall": "node ./node_modules/vscode/bin/install",
     "test": "node ./node_modules/vscode/bin/test"
+  },
+  "homepage": "https://github.com/NaccOll/markdown-handy",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NaccOll/markdown-handy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/NaccOll/markdown-handy/issues"
   },
   "dependencies": {
     "argparse": "^1.0.9",
