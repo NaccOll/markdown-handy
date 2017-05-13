@@ -63,12 +63,6 @@ let mdfilename = '';
 
 function activate(context) {
   utils.init();
-  // let disposable_command = vscode.commands.registerCommand(
-  //   'extension.markdown-handy.convert',
-  //   function () {
-  //     MarkdownConvert();
-  //   });
-  // context.subscriptions.push(disposable_command);
 
   let provider = MarkdownProvider.create(context)
   let reg1 = vscode.workspace.registerTextDocumentContentProvider('markdown-handy', provider)
@@ -563,7 +557,7 @@ const MarkdownProvider = {
         setTimeout(() => {
           this._waiting = false;
           this.emitter.fire(uri);
-        }, 600);
+        }, 300);
       }
     },
     provideTextDocumentContent: function (uri, token) {
@@ -577,7 +571,7 @@ const MarkdownProvider = {
         <link rel="stylesheet" href="file://${this.basePath}/styles/mdmath.css">
         <base href="${MarkdownProvider.activeDocument.uri.toString(true)}">
         </head>
-        <body>
+        <body class="markdown-body">
         ${MarkdownProvider.document}
         </body></html>`;
       }

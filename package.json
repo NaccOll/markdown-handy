@@ -1,8 +1,8 @@
 {
   "name": "markdown-handy",
   "displayName": "Markdown Handy",
-  "description": "Convert",
-  "version": "0.0.2",
+  "description": "Preview,Convert,Math",
+  "version": "0.0.3",
   "publisher": "NaccOll",
   "engines": {
     "vscode": "^1.11.0"
