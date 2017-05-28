@@ -40,3 +40,7 @@ change style, delete jpeg and png.
 
 Fork and change [mdmath](https://github.com/goessner/mdmath)
 provide katex support
+
+### 0.0.4
+
+Improve refresh when update document.
