@@ -1,5 +1,4 @@
 'use strict';
-
 const vscode = require('vscode')
 const path = require('path')
 const fs = require('fs')
@@ -27,6 +26,7 @@ const md = require('markdown-it')({
     return '<pre class="hljs"><code><div>' + str + '</div></code></pre>';
   }
 });
+
 // checkbox
 md.use(require('markdown-it-checkbox'));
 let f = vscode.workspace.getConfiguration('markdown-handy')['emoji'];
@@ -56,10 +56,45 @@ if (f) {
     }
   };
 }
+let defaultRender =md.renderer.rules.image
+md.renderer.rules.image = function (tokens, idx, options, env, self) {
+    let token = tokens[idx];
+    let href = token.attrs[token.attrIndex('src')][1];
+    let data = utils.readFile(href,null).toString('base64');
+    token.attrs[token.attrIndex('src')][1] = 'data:image/png;base64,' + data;
+    let res=defaultRender(tokens, idx, options, env, self);
+    return res;
+  };
+const normalizeLink = md.normalizeLink;
+md.normalizeLink = function (link) {
+  try {
+    var uri = vscode.Uri.parse(link);
+    if (!uri.scheme && uri.path && !uri.fragment) {
+      // Assume it must be a file
+      if (uri.path[0] === '/') {
+        uri = vscode.Uri.file(path.join(vscode.workspace.rootPath || '', uri.path));
+      } else {
+        let document = vscode.window.activeTextEditor.document;
+        uri = vscode.Uri.file(path.join(path.dirname(document.uri.fsPath), uri.path));
+      }
+      let res = normalizeLink(uri.toString(true))
+      return res;
+    }
+  } catch (e) {
+    // noop
+  }
+  return normalizeLink(link);
+};
+const validateLink = md.validateLink;
+md.validateLink = function (link) {
+  // support file:// links
+  let res = validateLink(link) || link.indexOf('file:') === 0;
+  return res;
+};
 
 const utils = require('./utils')
 let mdfilename = '';
-
+let previewCss = readStyles();
 
 function activate(context) {
   utils.init();
@@ -72,12 +107,15 @@ function activate(context) {
   let cfg = (key) => vscode.workspace.getConfiguration('markdown-handy')[key]
 
 
+  vscode.workspace.onDidSaveTextDocument(document => {
+    if (isTargetMarkdownFile(document)) {
+      const uri = getMarkdownUri(document.uri);
+      provider.update(uri);
+    }
+  });
   vscode.workspace.onDidChangeTextDocument(event => {
-    if (event.document.languageId === 'markdown' &&
-      event.document.uri.scheme !== 'markdown' // prevent processing of own documents
-      &&
-      event.document.isDirty) {
-      const uri = vscode.Uri.parse('markdown-handy://extension/markdown-handy');
+    if (isTargetMarkdownFile(event.document)) {
+      const uri = getMarkdownUri(event.document.uri);
       provider.update(uri);
     }
   });
@@ -110,6 +148,15 @@ exports.activate = activate;
 // this method is called when your extension is deactivated
 function deactivate() {}
 exports.deactivate = deactivate;
+
+function isTargetMarkdownFile(document) {
+  return document.languageId === 'markdown';
+}
+
+function getMarkdownUri(uri) {
+  // return vscode.Uri.parse('markdown-handy://extension/markdown-handy');
+  return uri.with({ scheme: 'markdown-handy', path: uri.path + '.rendered', query: uri.toString() });
+}
 
 function MarkdownConvert() {
   // check active window
@@ -160,7 +207,7 @@ function MarkdownConvert() {
     let content = convertMarkdownToHtml(mdfilename, type);
 
     // make html
-    let html = makeHtml(content);
+    let html = makeHtml(content, type);
 
     // let types = ['html', 'pdf'];
     let filename = mdfilename.replace(ext, '.' + type);
@@ -278,10 +325,10 @@ function exportHtml(data, filename) {
 }
 
 
-function makeHtml(data) {
+function makeHtml(data, type) {
   // read styles
   let style = '';
-  style += readStyles();
+  style += readStyles(type);
 
   // read template
   let filename = path.join(__dirname, 'template', 'template.html');
@@ -302,7 +349,7 @@ function makeHtml(data) {
   return mustache.render(template, view);
 }
 
-function readStyles() {
+function readStyles(type = 'html') {
   let style = '';
   let styles = '';
   let filename = '';
@@ -325,6 +372,7 @@ function readStyles() {
     }
   }
 
+
   // 3. read the style of the highlight.js.
   let highlightStyle = vscode.workspace.getConfiguration('markdown-handy')['highlightStyle'] || '';
   let ishighlight = vscode.workspace.getConfiguration('markdown-handy')['highlight'];
@@ -339,8 +387,9 @@ function readStyles() {
   }
 
   // 4. read the style of the markdown-pdf.
-  style += makeCss(path.join(__dirname, 'styles', 'markdown-pdf.css'));
-
+  if (type === 'pdf') {
+    style += makeCss(path.join(__dirname, 'styles', 'markdown-pdf.css'));
+  }
   // 5. read the style of the markdown-pdf.styles settings.
   styles = vscode.workspace.getConfiguration('markdown-handy')['styles'] || '';
   if (styles && Array.isArray(styles) && styles.length > 0) {
@@ -562,30 +611,46 @@ const MarkdownProvider = {
     },
     provideTextDocumentContent: function (uri, token) {
       if (!token || !token.isCancellationRequested) {
-        // save current document for accessing it from preview window later ...
-        MarkdownProvider._activeDocument = vscode.window.activeTextEditor.document;
-        return `<!doctype html><html><head><meta charset='utf-8'>
-        <link rel="stylesheet" href="file://${this.basePath}/styles/markdown.css">
-        <link rel="stylesheet" href="file://${this.basePath}/styles/tomorrow.css">
-        <link rel="stylesheet" href="file://${this.basePath}/styles/katex.min.css">
-        <link rel="stylesheet" href="file://${this.basePath}/styles/mdmath.css">
-        <base href="${MarkdownProvider.activeDocument.uri.toString(true)}">
-        </head>
-        <body class="markdown-body">
-        ${MarkdownProvider.document}
-        </body></html>`;
+        MarkdownProvider._activeDocument = MarkdownProvider.activeDocument
+        if (!MarkdownProvider.activeDocument) {
+          return;
+        }
+        const res = [
+          '<!DOCTYPE html>',
+          '<html>',
+          '<head>',
+          '<meta http-equiv="Content-type" content="text/html;charset=UTF-8">',
+          previewCss,
+          `<base href="${MarkdownProvider.activeDocument.uri.toString(true)}">`,
+          '</head>',
+          '<body class="markdown-body">',
+          `${MarkdownProvider.document}`,
+          '</body>',
+          '</html>'
+        ].join('\n');
+        return res;
       }
     }
   },
 
-  showPreviewCmd: function () {
-    vscode.commands.executeCommand('vscode.previewHtml',
-        MarkdownProvider.viewUri,
-        vscode.ViewColumn.Two,
-        "Preview: " + path.basename(MarkdownProvider.fname))
-      .then(success => {}, error => {
-        console.error(error)
-      });
+  showPreviewCmd: function (uri) {
+    let resource = uri;
+    // if(!isTargetMarkdownFile(vscode.window.activeTextEditor.document)){
+    //   return;
+    // }
+    if (!(resource instanceof vscode.Uri)) {
+      if (vscode.window.activeTextEditor) {
+        resource = vscode.window.activeTextEditor.document.uri;
+      }
+    }
+    if (!(resource instanceof vscode.Uri)) {
+      if (!vscode.window.activeTextEditor) {
+        return vscode.commands.executeCommand('markdown-handy.showPreview');
+      }
+      return;
+    }
+    let thenable = vscode.commands.executeCommand('vscode.previewHtml', getMarkdownUri(resource), vscode.ViewColumn.Two, `Preview '${path.basename(resource.fsPath)}'`);
+    return thenable;
   },
   clipHtmlCmd: function () {
     let html = `<!doctype html><html><head><meta charset='utf-8'>

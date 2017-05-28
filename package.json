@@ -2,7 +2,7 @@
   "name": "markdown-handy",
   "displayName": "Markdown Handy",
   "description": "Preview,Convert,Math",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "NaccOll",
   "engines": {
     "vscode": "^1.11.0"
@@ -17,7 +17,8 @@
   ],
   "main": "./extension",
   "contributes": {
-    "commands": [{
+    "commands": [
+      {
         "command": "markdown-handy.showPreview",
         "title": "Markdown Preview",
         "category": "Markdown"
@@ -34,11 +35,13 @@
       }
     ],
     "menus": {
-      "editor/context": [{
-        "when": "resourceLangId == markdown",
-        "command": "markdown-handy.exportToOther",
-        "group": "markdown-handy"
-      }]
+      "editor/context": [
+        {
+          "when": "resourceLangId == markdown",
+          "command": "markdown-handy.exportToOther",
+          "group": "markdown-handy"
+        }
+      ]
     },
     "configuration": {
       "type": "object",
@@ -209,7 +212,6 @@
         }
       }
     }
-
   },
   "scripts": {
     "postinstall": "node ./node_modules/vscode/bin/install",
@@ -237,17 +239,17 @@
     "lodash.assign": "^4.2.0",
     "markdown-it": "^8.2.2",
     "markdown-it-anchor": "^3.0.0",
-    "markdown-it-footnote": "^3.0.1",
-    "markdown-it-table-of-contents": "^0.3.2",
     "markdown-it-checkbox": "^1.1.0",
     "markdown-it-emoji": "^1.2.0",
+    "markdown-it-footnote": "^3.0.1",
+    "markdown-it-table-of-contents": "^0.3.2",
     "match-at": "^0.1.0",
     "mdurl": "^1.0.1",
     "mustache": "^2.2.1",
-    "which": "^1.2.10",
     "sprintf-js": "^1.0.3",
     "string": "^3.3.3",
-    "uc.micro": "^1.0.3"
+    "uc.micro": "^1.0.3",
+    "which": "^1.2.10"
   },
   "devDependencies": {
     "typescript": "^2.0.3",
