@@ -1,13 +1,3 @@
-/**
- * File: \utils.js
- * Project: Markdown Handy
- * Created Date: 2017-05-11 19:08:13
- * Author: NaccOll
- * -----
- * Modified By: NaccOll
- * Last Modified: 2017-05-12 22:25:44
- * -----
- */
 
 const vscode = require('vscode')
 const path = require('path')
@@ -155,8 +145,12 @@ function installPhantomjsBinary() {
     return;
   }
 }
+function getMarkdownUri(uri) {
+  // return vscode.Uri.parse('markdown-handy://extension/markdown-handy');
+  return uri.with({ scheme: 'markdown-handy', path: uri.path + '.rendered', query: uri.toString() });
+}
 
-
+exports.getMarkdownUri = getMarkdownUri
 exports.init = init
 exports.checkPhantomjs = checkPhantomjs
 exports.getPhantomjsPath = getPhantomjsPath
