@@ -39,3 +39,11 @@
 ### 0.0.2
 
 以[mdmath](https://github.com/goessner/mdmath)为蓝本，进行修改。支持Katex，提供预览功能，但禁止预览时选择其他样式。
+
+### 0.0.4
+
+修复预览刷新时的闪屏现象
+
+### 0.0.5
+
+增加`markdown-it-named-headers`

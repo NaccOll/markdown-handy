@@ -3,6 +3,8 @@ const vscode = require('vscode')
 const hljs = require('highlight.js')
 const path = require('path')
 const utils = require('./utils')
+var tableOfContentsProvider_1 = require("./tableOfContentsProvider");
+var mdnh = require('markdown-it-named-headers');
 const md = require('markdown-it')({
   html: true,
   breaks: vscode.workspace.getConfiguration('markdown-handy')['breaks'],
@@ -22,6 +24,8 @@ const md = require('markdown-it')({
     }
     return '<pre class="hljs"><code><div>' + str + '</div></code></pre>';
   }
+}).use(mdnh, {
+  slugify: function (header) { return tableOfContentsProvider_1.TableOfContentsProvider.slugify(header); }
 });
 
 // checkbox

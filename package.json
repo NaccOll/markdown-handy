@@ -2,7 +2,7 @@
   "name": "markdown-handy",
   "displayName": "Markdown Handy",
   "description": "Preview,Convert,Math",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "NaccOll",
   "engines": {
     "vscode": "^1.11.0"
@@ -242,6 +242,7 @@
     "markdown-it-checkbox": "^1.1.0",
     "markdown-it-emoji": "^1.2.0",
     "markdown-it-footnote": "^3.0.1",
+    "markdown-it-named-headers": "0.0.4",
     "markdown-it-table-of-contents": "^0.3.2",
     "match-at": "^0.1.0",
     "mdurl": "^1.0.1",

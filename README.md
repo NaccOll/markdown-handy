@@ -44,3 +44,8 @@ provide katex support
 ### 0.0.4
 
 Improve refresh when update document.
+
+
+### 0.0.5
+
+Add `markdown-it-named-headers`
