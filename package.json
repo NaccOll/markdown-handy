@@ -2,7 +2,7 @@
   "name": "markdown-handy",
   "displayName": "Markdown Handy",
   "description": "Preview,Convert,Math",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "NaccOll",
   "engines": {
     "vscode": "^1.11.0"
@@ -35,13 +35,11 @@
       }
     ],
     "menus": {
-      "editor/context": [
-        {
-          "when": "resourceLangId == markdown",
-          "command": "markdown-handy.exportToOther",
-          "group": "markdown-handy"
-        }
-      ]
+      "editor/context": [{
+        "when": "resourceLangId == markdown",
+        "command": "markdown-handy.exportToOther",
+        "group": "markdown-handy"
+      }]
     },
     "configuration": {
       "type": "object",
@@ -177,6 +175,16 @@
           "default": 10000,
           "description": "Statusbar message timeout [milliseconds]"
         },
+        "markdown-handy.checkbox.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "CheckBox in markdown enabled."
+        },
+        "markdown-handy.named-headers.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Named-headers in markdown enabled."
+        },
         "markdown-handy.footnotes": {
           "type": "boolean",
           "default": true,
@@ -184,7 +192,7 @@
         },
         "markdown-handy.toc.enabled": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "'Table of Contents' generation in markdown enabled."
         },
         "markdown-handy.toc.includeLevel": {
