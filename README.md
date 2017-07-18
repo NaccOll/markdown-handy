@@ -49,3 +49,8 @@ Improve refresh when update document.
 ### 0.0.5
 
 Add `markdown-it-named-headers`
+
+
+### 0.0.7
+
+use ts, fix bug

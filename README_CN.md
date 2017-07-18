@@ -47,3 +47,7 @@
 ### 0.0.5
 
 增加`markdown-it-named-headers`
+
+### 0.0.7
+
+改用ts，修复bug
