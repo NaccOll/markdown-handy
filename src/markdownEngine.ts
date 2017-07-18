@@ -42,7 +42,6 @@ export class MarkdownEngine {
     public get engine(): MarkdownIt {
         if (!this.md) {
             const hljs = require('highlight.js')
-            const mdnh = require('markdown-it-named-headers')
             this.md = require('markdown-it')({
                 html: true,
                 highlight: (str: string, lang: string) => {

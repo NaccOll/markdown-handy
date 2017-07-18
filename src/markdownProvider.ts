@@ -11,13 +11,14 @@ import { rootPath } from './utils'
 import * as url from 'url'
 
 
-export class MarkdownProvider {
+export class MarkdownProvider implements vscode.TextDocumentContentProvider{
     public engine: MarkdownEngine
     public context: vscode.ExtensionContext
-    private emitter: vscode.EventEmitter<1> // ??
+    private emitter = new vscode.EventEmitter<vscode.Uri>();
     private _waiting: boolean
     private basePath: string
     private _styles: string
+    private _scripts: string
 
     constructor(engine: MarkdownEngine, context: vscode.ExtensionContext) {
         this.engine = engine
@@ -41,10 +42,10 @@ export class MarkdownProvider {
             let filename = ''
             let i
 
-            // 1. read the style of the vscode.
+            // read the style of the vscode.
             style += makeCss(path.join(rootPath, 'styles', 'markdown.css'))
 
-            // 2. read the style of the markdown.styles setting.
+            // read the style of the markdown.styles setting.
             styles = vscode.workspace.getConfiguration('markdown-handy')['styles']
             if (styles && Array.isArray(styles) && styles.length > 0) {
                 for (i = 0; i < styles.length; i++) {
@@ -96,6 +97,20 @@ export class MarkdownProvider {
             style = this._styles
         }
         return style
+    }
+
+    getScripts(): string {
+        function makeScript(filename: string): string {
+            let script = utils.readFile(filename)
+            return script ? '\n<script>\n' + script + '\n</script>\n' : ''
+        }
+        let script = ''
+        if (!this._scripts) {
+            script += makeScript(path.join(rootPath,'scripts','flowchart.min.js'))
+        } else {
+            script = this._scripts
+        }
+        return script
     }
 
     math(tex, disp) {
@@ -156,26 +171,6 @@ export class MarkdownProvider {
         }
         return this.engine.render(this.activeDocument.uri, this.hideFrontMatter, text)
     }
-    get document(): string {
-        if (!this.activeDocument) {
-            return ''
-        }
-        const res = [
-            '<!DOCTYPE html>',
-            '<html>',
-            '<head>',
-            '<meta http-equiv="Content-type" content="text/html;charset=UTF-8">',
-            this.getStyles(),
-            `<base href="${this.activeDocument.uri.toString(true)}">`,
-            '</head>',
-            '<body class="markdown-body">',
-            `${this.documentBody}`,
-            '</body>',
-            '</html>'
-        ].join('\n')
-
-        return res
-    }
     get documentFile(): string {
         // read template
         let filename = path.join(rootPath, 'template', 'template.html')
@@ -196,8 +191,31 @@ export class MarkdownProvider {
         return mustache.render(template.toString(), view)
     }
     provideTextDocumentContent(uri: vscode.Uri) {
-        return this.document
+        if (!this.activeDocument) {
+            return ''
+        }
+        const res = [
+            '<!DOCTYPE html>',
+            '<html>',
+            '<head>',
+            '<meta http-equiv="Content-type" content="text/html;charset=UTF-8">',
+            this.getStyles(),
+            // this.getScripts(),
+            `<base href="${this.activeDocument.uri.toString(true)}">`,
+            '</head>',
+            '<body class="markdown-body">',
+            `${this.documentBody}`,
+            '</body>',
+            '</html>'
+        ].join('\n')
+
+        return res
     }
+
+    get onDidChange(): vscode.Event<vscode.Uri> {
+		return this.emitter.event;
+	}
+
     update(uri) {
         if (!this._waiting) {
             this._waiting = true;
