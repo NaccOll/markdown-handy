@@ -9,6 +9,7 @@ import * as cp from 'copy-paste'
 import * as vscode from 'vscode'
 
 export function activate(context: vscode.ExtensionContext) {
+    vscode.window.showWarningMessage('This extension is deprecated, Please use markdown-preview-enhanced!')
     utils.init()
     let engine = new MarkdownEngine()
     let provider = new MarkdownProvider(engine, context)
