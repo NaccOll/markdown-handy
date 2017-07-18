@@ -6,65 +6,57 @@ import { MarkdownEngine } from './markdownEngine'
 import { MarkdownProvider } from './markdownProvider'
 import * as path from 'path'
 import * as cp from 'copy-paste'
+import * as vscode from 'vscode'
 
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-import * as vscode from 'vscode';
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-    utils.init();
-    let engine = new MarkdownEngine();
-    let provider = new MarkdownProvider(engine, context);
-    let reg1 = vscode.workspace.registerTextDocumentContentProvider('markdown-handy', provider);
-    let reg2 = vscode.commands.registerCommand('markdown-handy.showPreview', showPreviewCmd);
-    let reg3 = vscode.commands.registerCommand('markdown-handy.exportToOther', exportHtmlCmd(provider));
-    let reg4 = vscode.commands.registerCommand('markdown-handy.clipToHtml', clipHtmlCmd(provider));
+    utils.init()
+    let engine = new MarkdownEngine()
+    let provider = new MarkdownProvider(engine, context)
+    let reg1 = vscode.workspace.registerTextDocumentContentProvider('markdown-handy', provider)
+    let reg2 = vscode.commands.registerCommand('markdown-handy.showPreview', showPreviewCmd)
+    let reg3 = vscode.commands.registerCommand('markdown-handy.exportToOther', exportHtmlCmd(provider))
+    let reg4 = vscode.commands.registerCommand('markdown-handy.clipToHtml', clipHtmlCmd(provider))
 
     vscode.workspace.onDidSaveTextDocument(document => {
         if (isTargetMarkdownFile(document)) {
-            const uri = utils.getMarkdownUri(document.uri);
-            provider.update(uri);
+            const uri = utils.getMarkdownUri(document.uri)
+            provider.update(uri)
         }
-    });
+    })
     vscode.workspace.onDidChangeTextDocument(event => {
         if (isTargetMarkdownFile(event.document)) {
-            const uri = utils.getMarkdownUri(event.document.uri);
-            provider.update(uri);
+            const uri = utils.getMarkdownUri(event.document.uri)
+            provider.update(uri)
         }
-    });
+    })
 
-    context.subscriptions.push(reg1, reg2, reg3, reg4);
-    context.subscriptions.push(reg1, reg2, reg3, reg4);
+    context.subscriptions.push(reg1, reg2, reg3, reg4)
+    context.subscriptions.push(reg1, reg2, reg3, reg4)
     console.log("'markdown-handy' activated !")
 
 }
 
-// this method is called when your extension is deactivated
 export function deactivate() {
 }
 function isTargetMarkdownFile(document) {
-    return document.languageId === 'markdown';
+    return document.languageId === 'markdown'
 }
 
 function showPreviewCmd(uri) {
-    let resource = uri;
-    // if(!isTargetMarkdownFile(vscode.window.activeTextEditor.document)){
-    //   return;
-    // }
+    let resource = uri
     if (!(resource instanceof vscode.Uri)) {
         if (vscode.window.activeTextEditor) {
-            resource = vscode.window.activeTextEditor.document.uri;
+            resource = vscode.window.activeTextEditor.document.uri
         }
     }
     if (!(resource instanceof vscode.Uri)) {
         if (!vscode.window.activeTextEditor) {
-            return vscode.commands.executeCommand('markdown-handy.showPreview');
+            return vscode.commands.executeCommand('markdown-handy.showPreview')
         }
-        return;
+        return
     }
-    let thenable = vscode.commands.executeCommand('vscode.previewHtml', utils.getMarkdownUri(resource), vscode.ViewColumn.Two, `Preview '${path.basename(resource.fsPath)}'`);
-    return thenable;
+    let thenable = vscode.commands.executeCommand('vscode.previewHtml', utils.getMarkdownUri(resource), vscode.ViewColumn.Two, `Preview '${path.basename(resource.fsPath)}'`)
+    return thenable
 }
 
 function exportHtmlCmd(provider: MarkdownProvider) {
@@ -89,10 +81,10 @@ function clipHtmlCmd(provider: MarkdownProvider) {
                     <link rel="stylesheet" href="https://gitcdn.xyz/repo/goessner/mdmath/master/css/mdmath.css">
                 </head>
                 <body class="markdown-body">
-                    ${provider.document}
+                    ${provider.documentBody}
                 </body>
-            </html>`;
-            cp.copy(html, () => vscode.window.showInformationMessage('Html copied to clipboard!'));
+            </html>`
+            cp.copy(html, () => vscode.window.showInformationMessage('Html copied to clipboard!'))
         }
     }
 }

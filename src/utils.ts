@@ -5,6 +5,8 @@ import { TextDocument } from 'vscode'
 import * as path from 'path'
 import * as fs from 'fs'
 
+export const rootPath = path.join(__dirname, '../..')
+
 vscode.window.activeTextEditor.document
 export function getPhantomjsPath(): string {
     // for reload phantomjs binary path

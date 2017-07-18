@@ -182,11 +182,6 @@
           "default": true,
           "description": "CheckBox in markdown enabled."
         },
-        "markdown-handy.named-headers": {
-          "type": "boolean",
-          "default": true,
-          "description": "Named-headers in markdown enabled."
-        },
         "markdown-handy.footnotes": {
           "type": "boolean",
           "default": true,
@@ -238,8 +233,8 @@
     "url": "https://github.com/NaccOll/markdown-handy/issues"
   },
   "dependencies": {
-    "@types/copy-paste": "^1.1.30",
     "@types/markdown-it": "0.0.2",
+    "anchor": "^0.11.5",
     "argparse": "^1.0.9",
     "cheerio": "^0.20.0",
     "copy-paste": "^1.3.0",
@@ -251,17 +246,14 @@
     "katex": "^0.6.0",
     "linkify-it": "^2.0.3",
     "lodash.assign": "^4.2.0",
-    "markdown-it": "^8.2.2",
-    "markdown-it-anchor": "^3.0.0",
+    "markdown-it": "^8.3.1",
+    "markdown-it-anchor": "^4.0.0",
     "markdown-it-checkbox": "^1.1.0",
     "markdown-it-emoji": "^1.2.0",
     "markdown-it-footnote": "^3.0.1",
-    "markdown-it-named-headers": "0.0.4",
     "markdown-it-table-of-contents": "^0.3.2",
     "match-at": "^0.1.0",
-    "mdurl": "^1.0.1",
     "mustache": "^2.2.1",
-    "sprintf-js": "^1.0.3",
     "string": "^3.3.3",
     "uc.micro": "^1.0.3",
     "which": "^1.2.10"
@@ -269,7 +261,6 @@
   "devDependencies": {
     "@types/mocha": "^2.2.32",
     "@types/node": "^6.0.40",
-    "eslint": "^3.6.0",
     "mocha": "^2.3.3",
     "typescript": "^2.0.3",
     "vscode": "^1.0.0"

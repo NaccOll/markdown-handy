@@ -6,7 +6,10 @@ import * as kt from 'katex'
 import * as path from 'path'
 import { MarkdownEngine } from './markdownEngine'
 import * as convert from './convert'
-let previewCss = convert.readStyles()
+import * as utils from './utils'
+import { rootPath } from './utils'
+import * as url from 'url'
+
 
 export class MarkdownProvider {
     public engine: MarkdownEngine
@@ -14,6 +17,7 @@ export class MarkdownProvider {
     private emitter: vscode.EventEmitter<1> // ??
     private _waiting: boolean
     private basePath: string
+    private _styles: string
 
     constructor(engine: MarkdownEngine, context: vscode.ExtensionContext) {
         this.engine = engine
@@ -21,6 +25,79 @@ export class MarkdownProvider {
         this.emitter = new vscode.EventEmitter()
         this.basePath = context.asAbsolutePath('.')
     }
+    get MDFileName() {
+        if (vscode.window.activeTextEditor) {
+            return vscode.window.activeTextEditor.document.uri.path
+        }
+    }
+    getStyles() {
+        function makeCss(filename) {
+            let css = utils.readFile(filename)
+            return css ? '\n<style>\n' + css + '\n</style>\n' : ''
+        }
+        let style = ''
+        if (!this._styles) {
+            let styles = ''
+            let filename = ''
+            let i
+
+            // 1. read the style of the vscode.
+            style += makeCss(path.join(rootPath, 'styles', 'markdown.css'))
+
+            // 2. read the style of the markdown.styles setting.
+            styles = vscode.workspace.getConfiguration('markdown-handy')['styles']
+            if (styles && Array.isArray(styles) && styles.length > 0) {
+                for (i = 0; i < styles.length; i++) {
+                    let href = filename = styles[i]
+                    let protocol = url.parse(href).protocol
+                    if (protocol === 'http:' || protocol === 'https:') {
+                        style += '<link rel=\"stylesheet\" href=\""' + href + '"\" type=\"text/css\">'
+                    } else if (protocol === 'file:') {
+                        style += makeCss(filename)
+                    }
+                }
+            }
+
+            // read the style of the highlight.js.
+            let highlightStyle = vscode.workspace.getConfiguration('markdown-handy')['highlightStyle'] || ''
+            let ishighlight = vscode.workspace.getConfiguration('markdown-handy')['highlight']
+            if (ishighlight) {
+                if (highlightStyle) {
+                    let css = vscode.workspace.getConfiguration('markdown-handy')['highlightStyle'] || 'github.css'
+                    filename = path.join(rootPath, 'node_modules', 'highlight.js', 'styles', css)
+                } else {
+                    filename = path.join(rootPath, 'styles', 'tomorrow.css')
+                }
+                style += makeCss(filename)
+            }
+
+            // read the style of the markdown-pdf.styles settings.
+            styles = vscode.workspace.getConfiguration('markdown-handy')['styles'] || ''
+            if (styles && Array.isArray(styles) && styles.length > 0) {
+                for (i = 0; i < styles.length; i++) {
+                    filename = styles[i]
+                    if (!path.isAbsolute(filename)) {
+                        if (vscode.workspace.rootPath == undefined) {
+                            filename = path.join(path.dirname(this.MDFileName), filename)
+                        } else {
+                            filename = path.join(vscode.workspace.rootPath, filename)
+                        }
+                    }
+                    style += makeCss(filename)
+                }
+            }
+
+            // 6. read the style of katex and mdmath.
+            let isMath = vscode.workspace.getConfiguration('markdown-handy')['math']
+            if (isMath) {
+                style += makeCss(path.join(rootPath, 'styles', 'katex.min.css'))
+            }
+        } else {
+            style = this._styles
+        }
+        return style
+    }
+
     math(tex, disp) {
         let res;
         try {
@@ -69,7 +146,7 @@ export class MarkdownProvider {
     get hideFrontMatter(): boolean {
         return vscode.workspace.getConfiguration('markdown')['previewFrontMatter'] === 'hide'
     }
-    get document(): string {
+    get documentBody(): string {
         let text = this.activeDocument.getText()
         if (this.hideFrontMatter) {
             text = text.replace(/^\s*?[{-]{3}([\s\S]+?)[}-]{3}\s*?/, '')
@@ -79,25 +156,47 @@ export class MarkdownProvider {
         }
         return this.engine.render(this.activeDocument.uri, this.hideFrontMatter, text)
     }
-    provideTextDocumentContent(uri: vscode.Uri) {
+    get document(): string {
         if (!this.activeDocument) {
-            return
+            return ''
         }
         const res = [
             '<!DOCTYPE html>',
             '<html>',
             '<head>',
             '<meta http-equiv="Content-type" content="text/html;charset=UTF-8">',
-            previewCss,
+            this.getStyles(),
             `<base href="${this.activeDocument.uri.toString(true)}">`,
             '</head>',
             '<body class="markdown-body">',
-            `${this.document}`,
+            `${this.documentBody}`,
             '</body>',
             '</html>'
         ].join('\n')
 
         return res
+    }
+    get documentFile(): string {
+        // read template
+        let filename = path.join(rootPath, 'template', 'template.html')
+        let template = utils.readFile(filename)
+
+        // compile template
+        const mustache = require('mustache')
+        let view
+        try {
+            view = {
+                style: this.getStyles(),
+                content: this.documentBody
+            }
+        } catch (e) {
+            vscode.window.showErrorMessage('ERROR: mustache:view')
+            vscode.window.showErrorMessage(e.message)
+        }
+        return mustache.render(template.toString(), view)
+    }
+    provideTextDocumentContent(uri: vscode.Uri) {
+        return this.document
     }
     update(uri) {
         if (!this._waiting) {

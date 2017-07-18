@@ -53,8 +53,6 @@ export class MarkdownEngine {
                     }
                     return `<pre class="hljs"><code><div>${this.engine.utils.escapeHtml(str)}</div></code></pre>`
                 }
-            }).use(mdnh, {
-                slugify: (header: string) => TableOfContentsProvider.slugify(header)
             })
 
             for (const plugin of this.plugins) {
@@ -74,29 +72,25 @@ export class MarkdownEngine {
                 this.md.use(require('markdown-it-checkbox'))
                 console.log("'markdown-it-checkbox' enabled.")
             }
-            if (cfg('named-headers')) {
-                this.md.use(require('markdown-it-named-headers'), {
-                    slugify: function(header) { return TableOfContentsProvider.slugify(header) }
-                })
-                console.log("'markdown-it-named-headers' enabled.")
-            }
+            this.md.use(require('markdown-it-anchor'), {
+                level: cfg('toc')['permalinkLevel'],
+                permalink: cfg('toc')['permalink'],
+                permalinkBefore: true,
+                permalinkSymbol: cfg('toc')['permalinkSymbol'],
+                slugify: function(header) { return TableOfContentsProvider.slugify(header) }
+            })
             if (cfg('footnotes')) {
                 this.md.use(require('markdown-it-footnote'))
                 console.log("'markdown-it-footnote' enabled.")
             }
             if (cfg('toc')['enabled']) {
-                this.md.use(require('markdown-it-anchor'), {
-                    level: cfg('toc')['permalinkLevel'],
-                    permalink: cfg('toc')['permalink'],
-                    permalinkBefore: true,
-                    permalinkSymbol: cfg('toc')['permalinkSymbol']
-                })
                 this.md.use(require('markdown-it-table-of-contents'), {
-                    includeLevel: cfg('toc')['includeLevel']
+                    includeLevel: cfg('toc')['includeLevel'],
+                    slugify: function(header) { return TableOfContentsProvider.slugify(header) }
                 })
                 console.log("'markdown-it-table-of-contents' enabled.")
             }
-            if (vscode.workspace.getConfiguration('markdown-handy')['emoji']) {
+            if (cfg('emoji')) {
                 const emojies_defs = require(path.join(__dirname, '../..', 'data', 'emoji.json'))
                 this.md.use(require('markdown-it-emoji'), {
                     defs: emojies_defs
